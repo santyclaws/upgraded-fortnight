@@ -4,10 +4,10 @@
 NOTEBOOK_URL="https://raw.githubusercontent.com/santyclaws/upgraded-fortnight/main/sheep.ipynb"
 
 # Define the local path where the notebook will be saved
-LOCAL_NOTEBOOK_PATH="/home/ubuntu/my_notebooks/sheep.ipynb"
+LOCAL_NOTEBOOK_PATH="./sheep.ipynb"
 
 # Define the path where you want to save the output (optional)
-OUTPUT_PATH="/home/ubuntu/my_notebooks/notebook_output.ipynb"
+OUTPUT_PATH="./notebook_output.ipynb"
 
 # Create directory if it doesn't exist
 mkdir -p /home/ubuntu/my_notebooks/
