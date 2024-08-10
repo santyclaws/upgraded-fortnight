@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the URL of the notebook
-NOTEBOOK_URL="https://path/to/your/notebook.ipynb"
+NOTEBOOK_URL="https://github.com/santyclaws/upgraded-fortnight/blob/main/sheep.ipynb"
 
 # Define the local path where the notebook will be saved
 LOCAL_NOTEBOOK_PATH="/home/ubuntu/my_notebooks/notebook.ipynb"
