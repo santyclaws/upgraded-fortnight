@@ -20,6 +20,7 @@ create_namespace() {
         echo "Failed to create namespace '$ns_name'."
         return 1
     }
+    echo "Successfully created namespace '$ns_name'."
 }
 
 # Function to create a virtual Ethernet pair
@@ -105,17 +106,11 @@ create_device() {
         return 1
     fi
 
-    # Create veth pair
-    sudo ip link add "$veth_host" type veth peer name "$veth_ns" || {
-        echo "Failed to create veth pair: $veth_host, $veth_ns"
-        return 1
-    }
+    # Create namespace if not already created
+    create_namespace "$ns_name" || return 1
 
-    # Assign the veth to the namespace
-    sudo ip link set "$veth_ns" netns "$ns_name" || {
-        echo "Failed to move $veth_ns to namespace $ns_name"
-        return 1
-    }
+    # Create veth pair
+    create_veth "$veth_host" "$veth_ns" "$ns_name" || return 1
 
     # Set the MAC address for the host side
     sudo ip link set dev "$veth_host" address "$mac_addr"
@@ -139,6 +134,7 @@ create_device() {
 
     # Start SNMP daemon with unique config in the namespace
     sudo ip netns exec "$ns_name" snmpd -Lo -C -c "$SNMP_CONF" &
+
     DEVICE_COUNT=$((DEVICE_COUNT + 1))
 }
 
@@ -208,4 +204,4 @@ simulate_network_activity() {
 }
 
 # Uncomment the following line to start the simulation
-simulate_network_activity
+# simulate_network_activity
