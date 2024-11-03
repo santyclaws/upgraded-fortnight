@@ -211,12 +211,25 @@ simulate_network_activity() {
             IP="$BASE_IP.$((START_IP + i))"
             
             # Poll SNMP data (e.g., system uptime or interface status)
-            snmpget -v 2c -c public "$IP" SNMPv2-MIB::sysUpTime.0 > /dev/null 2>&1
+            echo "Polling SNMP data from $IP..."
+            SNMP_OUTPUT=$(snmpget -v 2c -c public "$IP" SNMPv2-MIB::sysUpTime.0 2>&1)
+            if [[ $? -eq 0 ]]; then
+                echo "Received SNMP response from $IP: $SNMP_OUTPUT"
+            else
+                echo "Failed to poll SNMP data from $IP: $SNMP_OUTPUT"
+            fi
             
             # Simulate a ping to the next device (simple traffic generation)
             NEXT_IP="$BASE_IP.$((START_IP + (i + 1) % DEVICE_COUNT))"
-            ping -c 1 "$NEXT_IP" > /dev/null 2>&1
+            echo "Pinging next device at $NEXT_IP..."
+            PING_OUTPUT=$(ping -c 1 "$NEXT_IP" 2>&1)
+            if [[ $? -eq 0 ]]; then
+                echo "Successfully pinged $NEXT_IP: $PING_OUTPUT"
+            else
+                echo "Ping to $NEXT_IP failed: $PING_OUTPUT"
+            fi
         done
+        echo "Completed one round of network activity simulation. Waiting for next round..."
         sleep 5  # Adjust the sleep duration as needed
     done
 }
