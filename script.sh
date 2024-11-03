@@ -97,7 +97,7 @@ generate_or_load_mac() {
         MAC_ADDRESSES[$device_name]=$(grep "$device_name" "$MAC_FILE" | cut -d '=' -f2)
     else
         local mac_suffix=$(printf '%02x:%02x' $((RANDOM % 256)) $((RANDOM % 256)))
-        MAC_ADDRESSES[$device_name]="00:0c:29:$mac_suffix"
+        MAC_ADDRESSES[$device_name]="00:0c:29:33:$mac_suffix"
         echo "$device_name=${MAC_ADDRESSES[$device_name]}" >> "$MAC_FILE"
     fi
 }
