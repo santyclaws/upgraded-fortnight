@@ -97,18 +97,27 @@ create_device() {
     local device_type=$2
     local ip=$3
 
-    # Load or generate MAC for this device
+    # Generate or load MAC for this device
     generate_or_load_mac "$device_name"
     local mac_addr="${MAC_ADDRESSES[$device_name]}"
-    
-    # Create a valid namespace name
+
+    # Create a valid namespace name (with underscores only)
     local ns_name="${device_name//-/_}"  # Replace dashes with underscores
     create_namespace "$ns_name" || return 1
 
-    # Create veth pair
+    # Create unique veth names
     local veth_host="veth_${ns_name}"
     local veth_ns="veth_${ns_name}_ns"
-    
+
+    # Debugging - Check if names are valid before creating
+    echo "Creating veth pair: $veth_host and $veth_ns"
+
+    # Check if device names are valid and unique
+    if [[ "${#veth_host}" -gt 15 || "${#veth_ns}" -gt 15 ]]; then
+        echo "Error: Device name too long: $veth_host or $veth_ns"
+        return 1
+    fi
+
     # Create veth pair
     sudo ip link add "$veth_host" type veth peer name "$veth_ns" || {
         echo "Failed to create veth pair: $veth_host, $veth_ns"
@@ -123,7 +132,7 @@ create_device() {
 
     # Set the MAC address for the host side
     sudo ip link set dev "$veth_host" address "$mac_addr"
-    
+
     # Configure IP for the host side
     sudo ip addr add "$ip/24" dev "$veth_host"
     sudo ip link set dev "$veth_host" up
@@ -145,6 +154,7 @@ create_device() {
     sudo ip netns exec "$ns_name" snmpd -Lo -C -c "$SNMP_CONF" &
     DEVICE_COUNT=$((DEVICE_COUNT + 1))
 }
+
 
 
 # Ensure mac_addresses.conf exists
