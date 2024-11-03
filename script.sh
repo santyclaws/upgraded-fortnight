@@ -1,32 +1,15 @@
 #!/bin/bash
 
-
-# Function to install snmpd if not installed
-install_snmpd() {
-    if ! command -v snmpd &> /dev/null; then
-        echo "snmpd not found. Installing..."
-        sudo apt-get update
-        sudo apt-get install -y snmpd
-    else
-        echo "snmpd is already installed."
-    fi
-}
-
 # Function to create a network namespace
 create_namespace() {
     local ns_name=$1
     ip netns add "$ns_name" 2>/dev/null
     if [ $? -ne 0 ]; then
-        echo "Namespace '$ns_name' already exists or cannot be created."
-        return 1
+        echo "Namespace '$ns_name' already exists. Deleting it."
+        ip netns del "$ns_name"
+        ip netns add "$ns_name"
     fi
     return 0
-}
-
-# Function to delete a network namespace
-delete_namespace() {
-    local ns_name=$1
-    ip netns del "$ns_name" 2>/dev/null
 }
 
 # Function to create a virtual Ethernet pair
@@ -48,6 +31,15 @@ create_veth() {
     fi
 
     return 0
+}
+
+# Ensure SNMP daemon is installed
+install_snmpd() {
+    if ! command -v snmpd &> /dev/null; then
+        echo "SNMP daemon (snmpd) not found. Installing..."
+        sudo apt-get update
+        sudo apt-get install -y snmpd
+    fi
 }
 
 # Configuration
@@ -135,19 +127,13 @@ create_device() {
     DEVICE_COUNT=$((DEVICE_COUNT + 1))
 }
 
-# Ensure snmpd is installed
-install_snmpd
-
-# Clean up existing namespaces if they exist
-NAMESPACES=("router-switch" "firewall-1" "firewall-2" "switch-1" "switch-2" "switch-3" "switch-4")
-for ns in "${NAMESPACES[@]}"; do
-    delete_namespace "$ns"
-done
-
 # Ensure mac_addresses.conf exists
 if [[ ! -f $MAC_FILE ]]; then
     touch $MAC_FILE
 fi
+
+# Install SNMP daemon if not already installed
+install_snmpd
 
 # Set up Device Counter
 DEVICE_COUNT=0
@@ -197,13 +183,4 @@ simulate_network_activity() {
             
             # Simulate a ping to the next device (simple traffic generation)
             NEXT_IP="$BASE_IP.$((START_IP + (i + 1) % DEVICE_COUNT))"
-            ping -c 1 "$NEXT_IP" > /dev/null 2>&1
-            
-            # Add sleep to mimic random polling intervals
-            sleep $((RANDOM % 5 + 1))
-        done
-    done
-}
-
-# Start network activity simulation in the background
-simulate_network_activity &
+            ping -c 1 "$
