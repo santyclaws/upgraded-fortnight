@@ -147,7 +147,7 @@ create_device() {
     # Configure SNMP for this device
     SNMP_CONF="/etc/snmp/snmpd_${device_name}.conf"  # Use device name in the config file
     sudo cp /etc/snmp/snmpd.conf "$SNMP_CONF"
-    echo "agentAddress udp:$ip:161" | sudo tee -a "$SNMP_CONF" > /dev/null
+    echo "agentAddress udp:0.0.0.0:161" | sudo tee -a "$SNMP_CONF" > /dev/null
     echo "rocommunity public" | sudo tee -a "$SNMP_CONF" > /dev/null
 
     # Start SNMP daemon with unique config in the namespace
