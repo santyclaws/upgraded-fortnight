@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# Function to install snmpd if not installed
+install_snmpd() {
+    if ! command -v snmpd &> /dev/null; then
+        echo "snmpd not found. Installing..."
+        sudo apt-get update
+        sudo apt-get install -y snmpd
+    else
+        echo "snmpd is already installed."
+    fi
+}
+
 # Function to create a network namespace
 create_namespace() {
     local ns_name=$1
@@ -9,6 +20,12 @@ create_namespace() {
         return 1
     fi
     return 0
+}
+
+# Function to delete a network namespace
+delete_namespace() {
+    local ns_name=$1
+    ip netns del "$ns_name" 2>/dev/null
 }
 
 # Function to create a virtual Ethernet pair
@@ -116,6 +133,15 @@ create_device() {
     sudo ip netns exec "$device_name" snmpd -Lo -C -c "$SNMP_CONF" &
     DEVICE_COUNT=$((DEVICE_COUNT + 1))
 }
+
+# Ensure snmpd is installed
+install_snmpd
+
+# Clean up existing namespaces if they exist
+NAMESPACES=("router-switch" "firewall-1" "firewall-2" "switch-1" "switch-2" "switch-3" "switch-4")
+for ns in "${NAMESPACES[@]}"; do
+    delete_namespace "$ns"
+done
 
 # Ensure mac_addresses.conf exists
 if [[ ! -f $MAC_FILE ]]; then
