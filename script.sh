@@ -4,19 +4,24 @@
 # Function to clean up existing network namespaces and veth pairs
 cleanup_namespaces() {
     echo "Cleaning up existing network namespaces and veth pairs..."
-    
+
     # Delete veth pairs if they exist
     for veth in $(ip link show | grep veth | awk '{print $2}' | sed 's/:$//'); do
         echo "Deleting veth pair: $veth"
-        ip link delete "$veth"
+        if ip link show "$veth" > /dev/null 2>&1; then
+            ip link delete "$veth"
+        else
+            echo "Veth pair $veth does not exist, skipping."
+        fi
     done
 
     # Delete namespaces
     for ns in $(ip netns list | awk '{print $1}'); do
         echo "Deleting namespace: $ns"
-        ip netns del "$ns"
+        ip netns del "$ns" 2>/dev/null || echo "Namespace $ns does not exist, skipping."
     done
 }
+
 
 
 # Function to create a network namespace
@@ -24,7 +29,7 @@ create_namespace() {
     local ns_name=$1
     if ip netns list | grep -q "$ns_name"; then
         echo "Namespace '$ns_name' already exists. Deleting it."
-        ip netns del "$ns_name"
+        ip netns del "$ns_name" 2>/dev/null || echo "Failed to delete existing namespace '$ns_name', it may not exist."
     fi
     ip netns add "$ns_name" || {
         echo "Failed to create namespace '$ns_name'."
@@ -33,11 +38,17 @@ create_namespace() {
     echo "Successfully created namespace '$ns_name'."
 }
 
+
 # Function to create a virtual Ethernet pair
 create_veth() {
     local veth1=$1
     local veth2=$2
     local ns_name=$3
+
+    if ip link show "$veth1" > /dev/null 2>&1 && ip link show "$veth2" > /dev/null 2>&1; then
+        echo "Veth pair $veth1 and $veth2 already exists, skipping creation."
+        return 0
+    fi
 
     ip link add "$veth1" type veth peer name "$veth2" || {
         echo "Failed to create veth pair: $veth1, $veth2"
@@ -51,6 +62,7 @@ create_veth() {
 
     return 0
 }
+
 
 # Ensure SNMP daemon is installed
 install_snmpd() {
