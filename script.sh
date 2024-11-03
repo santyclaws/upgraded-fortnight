@@ -1,14 +1,13 @@
 #!/bin/bash
 
-# Function to clean up existing network namespaces
 # Function to clean up existing network namespaces and veth pairs
 cleanup_namespaces() {
     echo "Cleaning up existing network namespaces and veth pairs..."
 
     # Delete veth pairs if they exist
     for veth in $(ip link show | grep veth | awk '{print $2}' | sed 's/:$//'); do
-        echo "Deleting veth pair: $veth"
         if ip link show "$veth" > /dev/null 2>&1; then
+            echo "Deleting veth pair: $veth"
             ip link delete "$veth"
         else
             echo "Veth pair $veth does not exist, skipping."
@@ -21,8 +20,6 @@ cleanup_namespaces() {
         ip netns del "$ns" 2>/dev/null || echo "Namespace $ns does not exist, skipping."
     done
 }
-
-
 
 # Function to create a network namespace
 create_namespace() {
@@ -38,14 +35,13 @@ create_namespace() {
     echo "Successfully created namespace '$ns_name'."
 }
 
-
 # Function to create a virtual Ethernet pair
 create_veth() {
     local veth1=$1
     local veth2=$2
     local ns_name=$3
 
-    if ip link show "$veth1" > /dev/null 2>&1 && ip link show "$veth2" > /dev/null 2>&1; then
+    if ip link show "$veth1" > /dev/null 2>&1; then
         echo "Veth pair $veth1 and $veth2 already exists, skipping creation."
         return 0
     fi
@@ -62,7 +58,6 @@ create_veth() {
 
     return 0
 }
-
 
 # Ensure SNMP daemon is installed
 install_snmpd() {
@@ -149,7 +144,7 @@ create_device() {
     echo "Created $device_type $device_name with IP $ip and MAC $mac_addr"
 
     # Configure SNMP for this device
-    SNMP_CONF="/etc/snmp/snmpd_${DEVICE_COUNT}.conf"
+    SNMP_CONF="/etc/snmp/snmpd_${device_name}.conf"  # Use device name in the config file
     sudo cp /etc/snmp/snmpd.conf "$SNMP_CONF"
     echo "agentAddress udp:$ip:161" | sudo tee -a "$SNMP_CONF" > /dev/null
     echo "rocommunity public" | sudo tee -a "$SNMP_CONF" > /dev/null
@@ -226,4 +221,4 @@ simulate_network_activity() {
 }
 
 # Uncomment the following line to start the simulation
-# simulate_network_activity
+simulate_network_activity
