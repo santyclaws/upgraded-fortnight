@@ -101,20 +101,23 @@ create_device() {
     generate_or_load_mac "$device_name"
     local mac_addr="${MAC_ADDRESSES[$device_name]}"
     
-    # Create a network namespace for this device
-    create_namespace "$device_name" || return 1
+    # Create a valid namespace name
+    local ns_name="${device_name//-/_}"  # Replace dashes with underscores
+    create_namespace "$ns_name" || return 1
 
     # Create veth pair
-    local veth_host="veth-${device_name}"
-    local veth_ns="veth-${device_name}-ns"
+    local veth_host="veth_${ns_name}"
+    local veth_ns="veth_${ns_name}_ns"
+    
+    # Create veth pair
     sudo ip link add "$veth_host" type veth peer name "$veth_ns" || {
         echo "Failed to create veth pair: $veth_host, $veth_ns"
         return 1
     }
 
     # Assign the veth to the namespace
-    sudo ip link set "$veth_ns" netns "$device_name" || {
-        echo "Failed to move $veth_ns to namespace $device_name"
+    sudo ip link set "$veth_ns" netns "$ns_name" || {
+        echo "Failed to move $veth_ns to namespace $ns_name"
         return 1
     }
 
@@ -126,9 +129,9 @@ create_device() {
     sudo ip link set dev "$veth_host" up
 
     # Configure IP for the namespace side
-    sudo ip netns exec "$device_name" ip addr add "$ip/24" dev "$veth_ns"
-    sudo ip netns exec "$device_name" ip link set dev "$veth_ns" address "$mac_addr"
-    sudo ip netns exec "$device_name" ip link set dev "$veth_ns" up
+    sudo ip netns exec "$ns_name" ip addr add "$ip/24" dev "$veth_ns"
+    sudo ip netns exec "$ns_name" ip link set dev "$veth_ns" address "$mac_addr"
+    sudo ip netns exec "$ns_name" ip link set dev "$veth_ns" up
 
     echo "Created $device_type $device_name with IP $ip and MAC $mac_addr"
 
@@ -139,9 +142,10 @@ create_device() {
     echo "rocommunity public" | sudo tee -a "$SNMP_CONF" > /dev/null
 
     # Start SNMP daemon with unique config in the namespace
-    sudo ip netns exec "$device_name" snmpd -Lo -C -c "$SNMP_CONF" &
+    sudo ip netns exec "$ns_name" snmpd -Lo -C -c "$SNMP_CONF" &
     DEVICE_COUNT=$((DEVICE_COUNT + 1))
 }
+
 
 # Ensure mac_addresses.conf exists
 if [[ ! -f $MAC_FILE ]]; then
