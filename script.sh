@@ -1,5 +1,37 @@
 #!/bin/bash
 
+# Function to create a network namespace
+create_namespace() {
+    local ns_name=$1
+    ip netns add "$ns_name" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "Namespace '$ns_name' already exists or cannot be created."
+        return 1
+    fi
+    return 0
+}
+
+# Function to create a virtual Ethernet pair
+create_veth() {
+    local veth1=$1
+    local veth2=$2
+    local ns_name=$3
+
+    ip link add "$veth1" type veth peer name "$veth2"
+    if [ $? -ne 0 ]; then
+        echo "Failed to create veth pair: $veth1, $veth2"
+        return 1
+    fi
+
+    ip link set "$veth2" netns "$ns_name"
+    if [ $? -ne 0 ]; then
+        echo "Failed to move $veth2 to namespace $ns_name"
+        return 1
+    fi
+
+    return 0
+}
+
 # Configuration
 BASE_IP="192.168.100"      # Base IP range for all simulated devices
 NET_INTERFACE="eth0"       # Primary network interface in Debian (adjust if needed)
@@ -50,7 +82,7 @@ create_device() {
     local mac_addr="${MAC_ADDRESSES[$device_name]}"
     
     # Create a network namespace for this device
-    sudo ip netns add "$device_name"
+    create_namespace "$device_name"
 
     # Create veth pair
     local veth_host="veth-${device_name}"
