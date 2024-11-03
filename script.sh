@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Function to install snmpd if not installed
 install_snmpd() {
     if ! command -v snmpd &> /dev/null; then
