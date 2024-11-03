@@ -1,15 +1,25 @@
 #!/bin/bash
 
+# Function to clean up existing network namespaces
+cleanup_namespaces() {
+    echo "Cleaning up existing network namespaces..."
+    for ns in $(ip netns list | awk '{print $1}'); do
+        echo "Deleting namespace: $ns"
+        ip netns del "$ns"
+    done
+}
+
 # Function to create a network namespace
 create_namespace() {
     local ns_name=$1
-    ip netns add "$ns_name" 2>/dev/null
-    if [ $? -ne 0 ]; then
+    if ip netns list | grep -q "$ns_name"; then
         echo "Namespace '$ns_name' already exists. Deleting it."
         ip netns del "$ns_name"
-        ip netns add "$ns_name"
     fi
-    return 0
+    ip netns add "$ns_name" || {
+        echo "Failed to create namespace '$ns_name'."
+        return 1
+    }
 }
 
 # Function to create a virtual Ethernet pair
@@ -44,6 +54,7 @@ install_snmpd() {
 
 # Configuration
 BASE_IP="192.168.100"      # Base IP range for all simulated devices
+NET_INTERFACE="eth0"       # Primary network interface in Debian (adjust if needed)
 MAC_FILE="mac_addresses.conf"  # File to store static MAC addresses
 
 # Static IPs for essential network elements
@@ -91,15 +102,21 @@ create_device() {
     local mac_addr="${MAC_ADDRESSES[$device_name]}"
     
     # Create a network namespace for this device
-    create_namespace "$device_name"
+    create_namespace "$device_name" || return 1
 
     # Create veth pair
     local veth_host="veth-${device_name}"
     local veth_ns="veth-${device_name}-ns"
-    sudo ip link add "$veth_host" type veth peer name "$veth_ns"
-    
+    sudo ip link add "$veth_host" type veth peer name "$veth_ns" || {
+        echo "Failed to create veth pair: $veth_host, $veth_ns"
+        return 1
+    }
+
     # Assign the veth to the namespace
-    sudo ip link set "$veth_ns" netns "$device_name"
+    sudo ip link set "$veth_ns" netns "$device_name" || {
+        echo "Failed to move $veth_ns to namespace $device_name"
+        return 1
+    }
 
     # Set the MAC address for the host side
     sudo ip link set dev "$veth_host" address "$mac_addr"
@@ -134,17 +151,20 @@ fi
 # Install SNMP daemon if not already installed
 install_snmpd
 
+# Clean up existing namespaces
+cleanup_namespaces
+
 # Set up Device Counter
 DEVICE_COUNT=0
 
 # Create essential devices with static IPs and MACs
-create_device "router-switch" "Router/Switch" "$ROUTER_IP"
-create_device "firewall-1" "Ethernet Firewall" "$FIREWALL1_IP"
-create_device "firewall-2" "WiFi Firewall" "$FIREWALL2_IP"
-create_device "switch-1" "Managed Switch" "$SWITCH1_IP"
-create_device "switch-2" "Managed Switch" "$SWITCH2_IP"
-create_device "switch-3" "Managed Switch" "$SWITCH3_IP"
-create_device "switch-4" "Managed Switch" "$SWITCH4_IP"
+create_device "router-switch" "Router/Switch" $ROUTER_IP
+create_device "firewall-1" "Ethernet Firewall" $FIREWALL1_IP
+create_device "firewall-2" "WiFi Firewall" $FIREWALL2_IP
+create_device "switch-1" "Managed Switch" $SWITCH1_IP
+create_device "switch-2" "Managed Switch" $SWITCH2_IP
+create_device "switch-3" "Managed Switch" $SWITCH3_IP
+create_device "switch-4" "Managed Switch" $SWITCH4_IP
 
 # Dynamic IP assignment for workstations and Wi-Fi devices
 START_IP=20  # Starting IP within the subnet for dynamic devices
@@ -152,19 +172,19 @@ START_IP=20  # Starting IP within the subnet for dynamic devices
 # Create Workstations (10 devices)
 for ((i=0; i<NUM_WORKSTATIONS; i++)); do
     IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "workstation-$i" "Workstation" "$IP"
+    create_device "workstation-$i" "Workstation" $IP
 done
 
 # Create WiFi Access Points (2 devices)
 for ((i=0; i<NUM_ACCESS_POINTS; i++)); do
     IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "access-point-$i" "WiFi AP" "$IP"
+    create_device "access-point-$i" "WiFi AP" $IP
 done
 
 # Create WiFi Devices (10 devices - MacBooks and iPhones)
 for ((i=0; i<NUM_WIFI_DEVICES; i++)); do
     IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "wifi-device-$i" "WiFi Device" "$IP"
+    create_device "wifi-device-$i" "WiFi Device" $IP
 done
 
 echo "Network simulation complete. Devices configured with SNMP, static IPs, and persistent MACs for essential network elements."
@@ -181,13 +201,12 @@ simulate_network_activity() {
             snmpget -v 2c -c public "$IP" SNMPv2-MIB::sysUpTime.0 > /dev/null 2>&1
             
             # Simulate a ping to the next device (simple traffic generation)
-            NEXT_DEVICE_INDEX=$(( (i + 1) % DEVICE_COUNT ))
-            NEXT_IP="$BASE_IP.$((START_IP + NEXT_DEVICE_INDEX))"
+            NEXT_IP="$BASE_IP.$((START_IP + (i + 1) % DEVICE_COUNT))"
             ping -c 1 "$NEXT_IP" > /dev/null 2>&1
         done
-        sleep 10  # Adjust sleep time to control the simulation interval
+        sleep 5  # Adjust the sleep duration as needed
     done
 }
 
-# Uncomment the line below to start the network activity simulation
+# Uncomment the following line to start the simulation
 # simulate_network_activity
