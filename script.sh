@@ -28,17 +28,15 @@ create_veth() {
     local veth2=$2
     local ns_name=$3
 
-    ip link add "$veth1" type veth peer name "$veth2"
-    if [ $? -ne 0 ]; then
+    ip link add "$veth1" type veth peer name "$veth2" || {
         echo "Failed to create veth pair: $veth1, $veth2"
         return 1
-    fi
+    }
 
-    ip link set "$veth2" netns "$ns_name"
-    if [ $? -ne 0 ]; then
+    ip link set "$veth2" netns "$ns_name" || {
         echo "Failed to move $veth2 to namespace $ns_name"
         return 1
-    fi
+    }
 
     return 0
 }
@@ -54,7 +52,6 @@ install_snmpd() {
 
 # Configuration
 BASE_IP="192.168.100"      # Base IP range for all simulated devices
-NET_INTERFACE="eth0"       # Primary network interface in Debian (adjust if needed)
 MAC_FILE="mac_addresses.conf"  # File to store static MAC addresses
 
 # Static IPs for essential network elements
@@ -79,14 +76,10 @@ generate_or_load_mac() {
     local device_name=$1
 
     if [[ -f $MAC_FILE && -n $(grep "$device_name" "$MAC_FILE") ]]; then
-        # Load MAC from file if it exists
         MAC_ADDRESSES[$device_name]=$(grep "$device_name" "$MAC_FILE" | cut -d '=' -f2)
     else
-        # Generate a new MAC address
         local mac_suffix=$(printf '%02x:%02x' $((RANDOM % 256)) $((RANDOM % 256)))
         MAC_ADDRESSES[$device_name]="00:0c:29:$mac_suffix"
-
-        # Save to file
         echo "$device_name=${MAC_ADDRESSES[$device_name]}" >> "$MAC_FILE"
     fi
 }
@@ -97,22 +90,16 @@ create_device() {
     local device_type=$2
     local ip=$3
 
-    # Generate or load MAC for this device
     generate_or_load_mac "$device_name"
     local mac_addr="${MAC_ADDRESSES[$device_name]}"
-
-    # Create a valid namespace name (with underscores only)
     local ns_name="${device_name//-/_}"  # Replace dashes with underscores
-    create_namespace "$ns_name" || return 1
+    local short_name="${device_name:0:12}"  # Limit to 12 characters
+    local veth_host="veth_${short_name}"
+    local veth_ns="veth_${short_name}_ns"
 
-    # Create unique veth names
-    local veth_host="veth_${ns_name}"
-    local veth_ns="veth_${ns_name}_ns"
-
-    # Debugging - Check if names are valid before creating
     echo "Creating veth pair: $veth_host and $veth_ns"
 
-    # Check if device names are valid and unique
+    # Check for name length
     if [[ "${#veth_host}" -gt 15 || "${#veth_ns}" -gt 15 ]]; then
         echo "Error: Device name too long: $veth_host or $veth_ns"
         return 1
@@ -155,8 +142,6 @@ create_device() {
     DEVICE_COUNT=$((DEVICE_COUNT + 1))
 }
 
-
-
 # Ensure mac_addresses.conf exists
 if [[ ! -f $MAC_FILE ]]; then
     touch $MAC_FILE
@@ -172,33 +157,33 @@ cleanup_namespaces
 DEVICE_COUNT=0
 
 # Create essential devices with static IPs and MACs
-create_device "router-switch" "Router/Switch" $ROUTER_IP
-create_device "firewall-1" "Ethernet Firewall" $FIREWALL1_IP
-create_device "firewall-2" "WiFi Firewall" $FIREWALL2_IP
-create_device "switch-1" "Managed Switch" $SWITCH1_IP
-create_device "switch-2" "Managed Switch" $SWITCH2_IP
-create_device "switch-3" "Managed Switch" $SWITCH3_IP
-create_device "switch-4" "Managed Switch" $SWITCH4_IP
+create_device "rtr" "Router/Switch" $ROUTER_IP
+create_device "fw-1" "Ethernet Firewall" $FIREWALL1_IP
+create_device "fw-2" "WiFi Firewall" $FIREWALL2_IP
+create_device "sw-1" "Managed Switch" $SWITCH1_IP
+create_device "sw-2" "Managed Switch" $SWITCH2_IP
+create_device "sw-3" "Managed Switch" $SWITCH3_IP
+create_device "sw-4" "Managed Switch" $SWITCH4_IP
 
 # Dynamic IP assignment for workstations and Wi-Fi devices
 START_IP=20  # Starting IP within the subnet for dynamic devices
 
 # Create Workstations (10 devices)
 for ((i=0; i<NUM_WORKSTATIONS; i++)); do
-    IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "workstation-$i" "Workstation" $IP
+    IP="$BASE_IP.$((START_IP + i))"  # Use i for unique IPs
+    create_device "ws-$i" "Workstation" $IP
 done
 
 # Create WiFi Access Points (2 devices)
 for ((i=0; i<NUM_ACCESS_POINTS; i++)); do
-    IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "access-point-$i" "WiFi AP" $IP
+    IP="$BASE_IP.$((START_IP + NUM_WORKSTATIONS + i))"  # Avoid overlap
+    create_device "ap-$i" "WiFi AP" $IP
 done
 
 # Create WiFi Devices (10 devices - MacBooks and iPhones)
 for ((i=0; i<NUM_WIFI_DEVICES; i++)); do
-    IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "wifi-device-$i" "WiFi Device" $IP
+    IP="$BASE_IP.$((START_IP + NUM_WORKSTATIONS + NUM_ACCESS_POINTS + i))"  # Avoid overlap
+    create_device "wi-$i" "WiFi Device" $IP
 done
 
 echo "Network simulation complete. Devices configured with SNMP, static IPs, and persistent MACs for essential network elements."
@@ -223,4 +208,4 @@ simulate_network_activity() {
 }
 
 # Uncomment the following line to start the simulation
-# simulate_network_activity
+simulate_network_activity
