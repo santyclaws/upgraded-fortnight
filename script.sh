@@ -9,7 +9,7 @@ cleanup_namespaces() {
     for veth in $(ip link show | grep veth | awk '{print $2}' | sed 's/:$//'); do
         if ip link show "$veth" > /dev/null 2>&1; then
             echo "Deleting veth pair: $veth"
-            ip link delete "$veth"
+            ip link delete "$veth" || echo "Failed to delete veth pair: $veth"
         else
             echo "Veth pair $veth does not exist, skipping."
         fi
@@ -21,6 +21,7 @@ cleanup_namespaces() {
         ip netns del "$ns" 2>/dev/null || echo "Namespace $ns does not exist, skipping."
     done
 }
+
 
 # Function to create a network namespace
 create_namespace() {
