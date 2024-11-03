@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Function to clean up existing network namespaces and veth pairs
+#2
 cleanup_namespaces() {
     echo "Cleaning up existing network namespaces and veth pairs..."
 
