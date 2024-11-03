@@ -44,7 +44,6 @@ install_snmpd() {
 
 # Configuration
 BASE_IP="192.168.100"      # Base IP range for all simulated devices
-NET_INTERFACE="eth0"       # Primary network interface in Debian (adjust if needed)
 MAC_FILE="mac_addresses.conf"  # File to store static MAC addresses
 
 # Static IPs for essential network elements
@@ -139,13 +138,13 @@ install_snmpd
 DEVICE_COUNT=0
 
 # Create essential devices with static IPs and MACs
-create_device "router-switch" "Router/Switch" $ROUTER_IP
-create_device "firewall-1" "Ethernet Firewall" $FIREWALL1_IP
-create_device "firewall-2" "WiFi Firewall" $FIREWALL2_IP
-create_device "switch-1" "Managed Switch" $SWITCH1_IP
-create_device "switch-2" "Managed Switch" $SWITCH2_IP
-create_device "switch-3" "Managed Switch" $SWITCH3_IP
-create_device "switch-4" "Managed Switch" $SWITCH4_IP
+create_device "router-switch" "Router/Switch" "$ROUTER_IP"
+create_device "firewall-1" "Ethernet Firewall" "$FIREWALL1_IP"
+create_device "firewall-2" "WiFi Firewall" "$FIREWALL2_IP"
+create_device "switch-1" "Managed Switch" "$SWITCH1_IP"
+create_device "switch-2" "Managed Switch" "$SWITCH2_IP"
+create_device "switch-3" "Managed Switch" "$SWITCH3_IP"
+create_device "switch-4" "Managed Switch" "$SWITCH4_IP"
 
 # Dynamic IP assignment for workstations and Wi-Fi devices
 START_IP=20  # Starting IP within the subnet for dynamic devices
@@ -153,19 +152,19 @@ START_IP=20  # Starting IP within the subnet for dynamic devices
 # Create Workstations (10 devices)
 for ((i=0; i<NUM_WORKSTATIONS; i++)); do
     IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "workstation-$i" "Workstation" $IP
+    create_device "workstation-$i" "Workstation" "$IP"
 done
 
 # Create WiFi Access Points (2 devices)
 for ((i=0; i<NUM_ACCESS_POINTS; i++)); do
     IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "access-point-$i" "WiFi AP" $IP
+    create_device "access-point-$i" "WiFi AP" "$IP"
 done
 
 # Create WiFi Devices (10 devices - MacBooks and iPhones)
 for ((i=0; i<NUM_WIFI_DEVICES; i++)); do
     IP="$BASE_IP.$((START_IP + DEVICE_COUNT))"
-    create_device "wifi-device-$i" "WiFi Device" $IP
+    create_device "wifi-device-$i" "WiFi Device" "$IP"
 done
 
 echo "Network simulation complete. Devices configured with SNMP, static IPs, and persistent MACs for essential network elements."
@@ -182,5 +181,13 @@ simulate_network_activity() {
             snmpget -v 2c -c public "$IP" SNMPv2-MIB::sysUpTime.0 > /dev/null 2>&1
             
             # Simulate a ping to the next device (simple traffic generation)
-            NEXT_IP="$BASE_IP.$((START_IP + (i + 1) % DEVICE_COUNT))"
-            ping -c 1 "$
+            NEXT_DEVICE_INDEX=$(( (i + 1) % DEVICE_COUNT ))
+            NEXT_IP="$BASE_IP.$((START_IP + NEXT_DEVICE_INDEX))"
+            ping -c 1 "$NEXT_IP" > /dev/null 2>&1
+        done
+        sleep 10  # Adjust sleep time to control the simulation interval
+    done
+}
+
+# Uncomment the line below to start the network activity simulation
+# simulate_network_activity
