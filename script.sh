@@ -1,13 +1,23 @@
 #!/bin/bash
 
 # Function to clean up existing network namespaces
+# Function to clean up existing network namespaces and veth pairs
 cleanup_namespaces() {
-    echo "Cleaning up existing network namespaces..."
+    echo "Cleaning up existing network namespaces and veth pairs..."
+    
+    # Delete veth pairs if they exist
+    for veth in $(ip link show | grep veth | awk '{print $2}' | sed 's/:$//'); do
+        echo "Deleting veth pair: $veth"
+        ip link delete "$veth"
+    done
+
+    # Delete namespaces
     for ns in $(ip netns list | awk '{print $1}'); do
         echo "Deleting namespace: $ns"
         ip netns del "$ns"
     done
 }
+
 
 # Function to create a network namespace
 create_namespace() {
